@@ -89,7 +89,7 @@ class GitHubEventHandler(object):
             raise ValueError('Unknown content type: %r' % (content_type,))
 
         payload['project'] = request.args.get('project', False)
-        if isinstance(project, list):
+        if isinstance(payload['project'], list):
             payload['project'] = payload['project'][0]
 
         log.msg("Payload: %r" % payload, logLevel=logging.DEBUG)
