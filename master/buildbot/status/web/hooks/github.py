@@ -102,8 +102,12 @@ class GitHubEventHandler(object):
         repo = payload['repository']['name']
         repo_url = payload['repository']['url']
         # NOTE: what would be a reasonable value for project?
-        # project = request.args.get('project', [''])[0]
-        project = payload['repository']['full_name']
+        project = request.args.get('project', False)
+        if isinstance(project, list):
+            project = project[0]
+
+        if not project:
+            project = payload['repository']['full_name']
 
         changes = self._process_change(payload, user, repo, repo_url, project)
 
