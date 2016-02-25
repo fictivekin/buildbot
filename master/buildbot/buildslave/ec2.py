@@ -59,7 +59,8 @@ class EC2LatentBuildSlave(AbstractLatentBuildSlave):
                  max_builds=None, notify_on_missing=[], missing_timeout=60 * 20,
                  build_wait_timeout=60 * 10, properties={}, locks=None,
                  spot_instance=False, max_spot_price=1.6, volumes=[],
-                 placement=None, price_multiplier=1.2, tags={}):
+                 placement=None, price_multiplier=1.2, tags={},
+                 subnet_id=None, security_group_ids=None):
 
         AbstractLatentBuildSlave.__init__(
             self, name, password, max_builds, notify_on_missing,
@@ -96,6 +97,8 @@ class EC2LatentBuildSlave(AbstractLatentBuildSlave):
         self.spot_instance = spot_instance
         self.max_spot_price = max_spot_price
         self.volumes = volumes
+        self.subnet_id = subnet_id
+        self.security_group_ids = security_group_ids
         self.price_multiplier = price_multiplier
         if None not in [placement, region]:
             self.placement = '%s%s' % (region, placement)
@@ -107,6 +110,14 @@ class EC2LatentBuildSlave(AbstractLatentBuildSlave):
             if aws_id_file_path is None:
                 home = os.environ['HOME']
                 aws_id_file_path = os.path.join(home, '.ec2', 'aws_id')
+        else:
+            assert aws_id_file_path is None, \
+                'if you supply the identifier and secret_identifier, ' \
+                'do not specify the aws_id_file_path'
+            assert secret_identifier is not None, \
+                'supply both or neither of identifier, secret_identifier'
+
+        if aws_id_file_path:
             if not os.path.exists(aws_id_file_path):
                 raise ValueError(
                     "Please supply your AWS access key identifier and secret "
@@ -116,12 +127,6 @@ class EC2LatentBuildSlave(AbstractLatentBuildSlave):
             with open(aws_id_file_path, 'r') as aws_file:
                 identifier = aws_file.readline().strip()
                 secret_identifier = aws_file.readline().strip()
-        else:
-            assert aws_id_file_path is None, \
-                'if you supply the identifier and secret_identifier, ' \
-                'do not specify the aws_id_file_path'
-            assert secret_identifier is not None, \
-                'supply both or neither of identifier, secret_identifier'
 
         region_found = None
 
@@ -266,10 +271,20 @@ class EC2LatentBuildSlave(AbstractLatentBuildSlave):
 
     def _start_instance(self):
         image = self.get_image()
-        reservation = image.run(
-            key_name=self.keypair_name, security_groups=[self.security_name],
-            instance_type=self.instance_type, user_data=self.user_data,
-            placement=self.placement)
+        image_args = {
+            'key_name': self.keypair_name,
+            'instance_type': self.instance_type,
+            'user_data': self.user_data,
+            'placement': self.placement
+        }
+        if self.subnet_id:
+            image_args['subnet_id'] = self.subnet_id
+        if self.security_group_ids:
+            image_args['security_group_ids'] = self.security_group_ids
+        elif self.security_name:
+            image_args['security_groups'] = [self.security_name]
+
+        reservation = image.run(**image_args)
         self.instance = reservation.instances[0]
         instance_id, image_id, start_time = self._wait_for_instance(
             reservation)
