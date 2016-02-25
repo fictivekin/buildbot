@@ -452,8 +452,15 @@ class IRCContact(base.StatusReceiver):
     def buildFinished(self, builderName, build, results):
         builder = build.getBuilder()
 
+        # Check tags set globally for this IRC reporter
         if (self.bot.tags is not None and
                 not builder.matchesAnyTag(self.bot.tags)):
+            return
+
+        # Check tags set specifically for this channel
+        if (self.dest in self.bot.channelAttributes and
+                'tags' in self.bot.channelAttributes[self.dest] and
+                not builder.matchesAnyTag(self.bot.channelAttributes[self.dest]['tags'])):
             return
 
         if not self.notify_for_finished(build):
@@ -886,6 +893,7 @@ class IrcStatusBot(irc.IRCClient):
                  useRevisions=False, showBlameList=False, useColors=True):
         self.nickname = nickname
         self.channels = channels
+        self.channelAttributes = {}
         self.pm_to_nicks = pm_to_nicks
         self.password = password
         self.status = status
@@ -956,9 +964,11 @@ class IrcStatusBot(irc.IRCClient):
             if isinstance(c, dict):
                 channel = c.get('channel', None)
                 password = c.get('password', None)
+                self.channelAttributes[channel] = c
             else:
                 channel = c
                 password = None
+                self.channelAttributes[channel] = {}
             self.join(channel=channel, key=password)
         for c in self.pm_to_nicks:
             self.getContact(c)
