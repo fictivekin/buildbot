@@ -88,6 +88,10 @@ class GitHubEventHandler(object):
         else:
             raise ValueError('Unknown content type: %r' % (content_type,))
 
+        payload['project'] = request.args.get('project', False)
+        if isinstance(project, list):
+            payload['project'] = payload['project'][0]
+
         log.msg("Payload: %r" % payload, logLevel=logging.DEBUG)
 
         return payload
@@ -102,10 +106,8 @@ class GitHubEventHandler(object):
         repo = payload['repository']['name']
         repo_url = payload['repository']['url']
         # NOTE: what would be a reasonable value for project?
-        project = request.args.get('project', False)
-        if isinstance(project, list):
-            project = project[0]
 
+        project = payload['project']
         if not project:
             project = payload['repository']['full_name']
 
